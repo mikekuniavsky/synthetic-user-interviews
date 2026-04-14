@@ -1,6 +1,7 @@
 import anthropic
+import random
 import requests
-from config import ANTHROPIC_API_KEY, OPENROUTER_API_KEY
+from config import ANTHROPIC_API_KEY, OPENROUTER_API_KEY, PERSONA_MODELS, RESEARCHER_MODELS
 
 _anthropic_client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
@@ -19,6 +20,9 @@ def call_claude(model: str, system_prompt: str, messages: list) -> str:
         max_tokens=500,
     )
     return response.content[0].text
+
+
+_ALL_MODELS = list(set(PERSONA_MODELS + RESEARCHER_MODELS))
 
 
 def call_openrouter(model: str, system_prompt: str, messages: list) -> str:
@@ -51,6 +55,14 @@ def call_openrouter(model: str, system_prompt: str, messages: list) -> str:
 
     if response.status_code == 402:
         raise SystemExit("OpenRouter credits exhausted. Add more at https://openrouter.ai/settings/credits")
+
+    if response.status_code in (429, 404):
+        alternatives = [m for m in _ALL_MODELS if m != model]
+        if alternatives:
+            fallback = random.choice(alternatives)
+            print(f"Error {response.status_code} on {model}, retrying with {fallback}")
+            return call_openrouter(fallback, system_prompt, messages)
+
     if not response.ok:
         print(f"API error {response.status_code}: {response.text}")
     response.raise_for_status()
