@@ -6,8 +6,8 @@ from config import ANTHROPIC_API_KEY, OPENROUTER_API_KEY, PERSONA_MODELS, RESEAR
 _anthropic_client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 
-def call_claude(model: str, system_prompt: str, messages: list) -> str:
-    """Make a single API call to Anthropic directly."""
+def call_claude(model: str, system_prompt: str, messages: list, max_tokens: int = MAX_TOKENS_TURN) -> tuple[str, str]:
+    """Make a single API call to Anthropic directly. Returns (content, model_used)."""
 
     # Anthropic requires at least one user message; bootstrap if none exist yet
     effective_messages = messages if messages else [{"role": "user", "content": "Please begin."}]
@@ -17,16 +17,16 @@ def call_claude(model: str, system_prompt: str, messages: list) -> str:
         system=system_prompt,
         messages=effective_messages,
         temperature=1.0,
-        max_tokens=500,
+        max_tokens=max_tokens,
     )
-    return response.content[0].text
+    return response.content[0].text, model
 
 
 _ALL_MODELS = list(set(PERSONA_MODELS + RESEARCHER_MODELS))
 
 
-def call_openrouter(model: str, system_prompt: str, messages: list, max_tokens: int = MAX_TOKENS_TURN) -> str:
-    """Make a single API call via OpenRouter."""
+def call_openrouter(model: str, system_prompt: str, messages: list, max_tokens: int = MAX_TOKENS_TURN) -> tuple[str, str]:
+    """Make a single API call via OpenRouter. Returns (content, model_used)."""
 
     # Anthropic requires at least one user message; bootstrap if none exist yet
     effective_messages = messages if messages else [{"role": "user", "content": "Please begin."}]
@@ -66,4 +66,4 @@ def call_openrouter(model: str, system_prompt: str, messages: list, max_tokens: 
     if not response.ok:
         print(f"API error {response.status_code}: {response.text}")
     response.raise_for_status()
-    return response.json()["choices"][0]["message"]["content"]
+    return response.json()["choices"][0]["message"]["content"], model

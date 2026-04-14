@@ -30,16 +30,19 @@ def _pick_researcher(researcher_models: list) -> str:
     return random.choice(researcher_models) if RANDOMIZE_RESEARCHER_MODEL else researcher_models[0]
 
 
-def run_interview(persona: dict, researcher_models: list) -> list:
+def run_interview(persona: dict, researcher_models: list) -> tuple[list, str]:
     """
     Run a single interview between the researcher and a persona.
-    Returns the full conversation history as a list of dicts.
+    Returns (transcript, researcher_model).
     """
+
+    # Pick one researcher model for the entire interview
+    researcher_model = _pick_researcher(researcher_models)
 
     print(f"\n{'='*60}")
     print(f"Starting interview with: {persona['name']}")
     print(f"Persona model: {persona['model']}")
-    print(f"Researcher models: {researcher_models}")
+    print(f"Researcher model: {researcher_model}")
     print(f"{'='*60}\n")
 
     # Separate conversation histories for each agent.
@@ -52,14 +55,14 @@ def run_interview(persona: dict, researcher_models: list) -> list:
 
     # Researcher opens the interview with a randomly chosen starting direction
     opening_prompt = random.choice(OPENING_PROMPTS)
-    opening = call_api(
-        model=_pick_researcher(researcher_models),
+    opening, opening_model = call_api(
+        model=researcher_model,
         system_prompt=RESEARCHER_PROMPT,
         messages=[{"role": "user", "content": opening_prompt}],
     )
 
-    print(f"RESEARCHER: {opening}\n")
-    transcript.append({"role": "researcher", "content": opening})
+    print(f"RESEARCHER ({opening_model}): {opening}\n")
+    transcript.append({"role": "researcher", "model": opening_model, "content": opening})
 
     # Seed researcher history with the bootstrap turn that was used to generate
     # the opening, so subsequent calls always start with a user message.
@@ -67,11 +70,38 @@ def run_interview(persona: dict, researcher_models: list) -> list:
     researcher_messages.append({"role": "assistant", "content": opening})
     persona_messages.append({"role": "user", "content": opening})
 
-    # Main conversation loop
+    # Main conversation loop — each turn is: researcher asks, persona answers.
+    # The loop ends on the persona's final answer, not a hanging researcher question.
     for turn in range(NUM_TURNS):
 
-        # Persona responds
-        persona_response = call_api(
+        # On the second-to-last turn, cue the researcher to move to Topic 7 (Close)
+        # so the final turn is the persona's answer to the closing question.
+        if turn == NUM_TURNS - 2:
+            cue = (
+                "\n\n[Note to interviewer: This is your second-to-last question. "
+                "Move to Topic 7 (Close) — ask what one thing they would change "
+                "about their early-stage process. The next response will be their last.]"
+            )
+            researcher_messages[-1] = {
+                **researcher_messages[-1],
+                "content": researcher_messages[-1]["content"] + cue,
+            }
+
+        # Researcher asks
+        researcher_response, researcher_model = call_api(
+            model=researcher_model,
+            system_prompt=RESEARCHER_PROMPT,
+            messages=researcher_messages,
+        )
+
+        print(f"RESEARCHER ({researcher_model}): {researcher_response}\n")
+        transcript.append({"role": "researcher", "model": researcher_model, "content": researcher_response})
+
+        researcher_messages.append({"role": "assistant", "content": researcher_response})
+        persona_messages.append({"role": "user", "content": researcher_response})
+
+        # Persona answers
+        persona_response, persona_model_used = call_api(
             model=persona["model"],
             system_prompt=persona["prompt"],
             messages=persona_messages,
@@ -83,23 +113,10 @@ def run_interview(persona: dict, researcher_models: list) -> list:
         persona_messages.append({"role": "assistant", "content": persona_response})
         researcher_messages.append({"role": "user", "content": persona_response})
 
-        # Researcher follows up — pick a fresh random model each turn
-        researcher_response = call_api(
-            model=_pick_researcher(researcher_models),
-            system_prompt=RESEARCHER_PROMPT,
-            messages=researcher_messages,
-        )
-
-        print(f"RESEARCHER: {researcher_response}\n")
-        transcript.append({"role": "researcher", "content": researcher_response})
-
-        researcher_messages.append({"role": "assistant", "content": researcher_response})
-        persona_messages.append({"role": "user", "content": researcher_response})
-
-    return transcript
+    return transcript, researcher_model
 
 
-def save_transcript(persona: dict, transcript: list, output_dir: Path) -> Path:
+def save_transcript(persona: dict, transcript: list, researcher_model: str, output_dir: Path) -> Path:
     """Save a single interview transcript to a JSON file."""
 
     output_dir.mkdir(exist_ok=True)
@@ -111,6 +128,7 @@ def save_transcript(persona: dict, transcript: list, output_dir: Path) -> Path:
         "persona_name": persona["name"],
         "discipline": persona["discipline"],
         "persona_model": persona["model"],
+        "researcher_model": researcher_model,
         "timestamp": timestamp,
         "transcript": transcript,
     }
@@ -154,7 +172,7 @@ def run_summary(transcript_files: list, summary_model: str) -> str:
 
     formatted_transcripts = format_transcripts_for_summary(transcript_files)
 
-    summary = call_api(
+    summary, _ = call_api(
         model=summary_model,
         system_prompt=SUMMARY_PROMPT,
         messages=[{
@@ -180,8 +198,7 @@ def run_summary(transcript_files: list, summary_model: str) -> str:
 def main():
 
     # In basic mode, every call uses ANTHROPIC_MODEL.
-    # In OpenRouter mode, persona gets a random model per interview;
-    # researcher gets a random model per turn (handled inside run_interview).
+    # In OpenRouter mode, persona and researcher each get one random model per interview.
     if USE_OPENROUTER:
         researcher_models = RESEARCHER_MODELS
         summary_model = SUMMARY_MODEL
@@ -197,8 +214,8 @@ def main():
         else:
             persona["model"] = ANTHROPIC_MODEL
 
-        transcript = run_interview(persona, researcher_models)
-        filepath = save_transcript(persona, transcript, OUTPUT_DIR)
+        transcript, researcher_model = run_interview(persona, researcher_models)
+        filepath = save_transcript(persona, transcript, researcher_model, OUTPUT_DIR)
         transcript_files.append(filepath)
 
         print(f"\nCompleted {i+1}/{len(PERSONAS)} interviews\n")
