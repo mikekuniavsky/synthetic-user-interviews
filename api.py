@@ -1,7 +1,7 @@
 import anthropic
 import random
 import requests
-from config import ANTHROPIC_API_KEY, OPENROUTER_API_KEY, PERSONA_MODELS, RESEARCHER_MODELS
+from config import ANTHROPIC_API_KEY, OPENROUTER_API_KEY, PERSONA_MODELS, RESEARCHER_MODELS, MAX_TOKENS_TURN, MAX_TOKENS_SUMMARY
 
 _anthropic_client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
@@ -25,7 +25,7 @@ def call_claude(model: str, system_prompt: str, messages: list) -> str:
 _ALL_MODELS = list(set(PERSONA_MODELS + RESEARCHER_MODELS))
 
 
-def call_openrouter(model: str, system_prompt: str, messages: list) -> str:
+def call_openrouter(model: str, system_prompt: str, messages: list, max_tokens: int = MAX_TOKENS_TURN) -> str:
     """Make a single API call via OpenRouter."""
 
     # Anthropic requires at least one user message; bootstrap if none exist yet
@@ -44,7 +44,7 @@ def call_openrouter(model: str, system_prompt: str, messages: list) -> str:
             *effective_messages,
         ],
         "temperature": 0.8,
-        "max_tokens": 1024,
+        "max_tokens": max_tokens,
     }
 
     response = requests.post(
@@ -61,7 +61,7 @@ def call_openrouter(model: str, system_prompt: str, messages: list) -> str:
         if alternatives:
             fallback = random.choice(alternatives)
             print(f"Error {response.status_code} on {model}, retrying with {fallback}")
-            return call_openrouter(fallback, system_prompt, messages)
+            return call_openrouter(fallback, system_prompt, messages, max_tokens=max_tokens)
 
     if not response.ok:
         print(f"API error {response.status_code}: {response.text}")

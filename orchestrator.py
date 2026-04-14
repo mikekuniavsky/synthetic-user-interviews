@@ -13,6 +13,7 @@ from config import (
     SUMMARY_MODEL,
     OUTPUT_DIR,
     NUM_TURNS,
+    MAX_TOKENS_SUMMARY,
 )
 from personas import PERSONAS
 from researcher_prompt import RESEARCHER_PROMPT
@@ -160,6 +161,7 @@ def run_summary(transcript_files: list, summary_model: str) -> str:
             "role": "user",
             "content": f"Here are the interview transcripts:\n{formatted_transcripts}\n\nPlease provide your synthesis.",
         }],
+        max_tokens=MAX_TOKENS_SUMMARY,
     )
 
     OUTPUT_DIR.mkdir(exist_ok=True)

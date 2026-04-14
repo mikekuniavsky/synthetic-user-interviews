@@ -42,3 +42,5 @@ SUMMARY_MODEL = "anthropic/claude-opus-4.6-fast"
 # --- Shared settings ---
 OUTPUT_DIR = Path("transcripts")
 NUM_TURNS = 12
+MAX_TOKENS_TURN = 1024    # per interview turn (persona/researcher)
+MAX_TOKENS_SUMMARY = 8192  # summary report
