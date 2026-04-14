@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv(".env.local")
 
 # --- Mode ---
-USE_OPENROUTER = False  # Set to True to use multi-model OpenRouter mode
+USE_OPENROUTER = True  # Set to True to use multi-model OpenRouter mode
 
 # --- API keys (set in .env.local) ---
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]

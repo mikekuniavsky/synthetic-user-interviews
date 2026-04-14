@@ -40,7 +40,7 @@ def call_openrouter(model: str, system_prompt: str, messages: list) -> str:
             *effective_messages,
         ],
         "temperature": 0.8,
-        "max_tokens": 500,
+        "max_tokens": 1024,
     }
 
     response = requests.post(
@@ -49,6 +49,8 @@ def call_openrouter(model: str, system_prompt: str, messages: list) -> str:
         json=payload,
     )
 
+    if response.status_code == 402:
+        raise SystemExit("OpenRouter credits exhausted. Add more at https://openrouter.ai/settings/credits")
     if not response.ok:
         print(f"API error {response.status_code}: {response.text}")
     response.raise_for_status()
