@@ -56,13 +56,23 @@ All settings are in `config.py`.
 
 ### Basic mode vs. multi-model mode
 
-**Basic mode** (default) uses the Anthropic SDK with a single model for everything — simpler and more reliable.
+**Basic mode** uses the Anthropic SDK with a single Claude model for all roles — simpler, no OpenRouter account needed.
 
-**Multi-model mode** uses OpenRouter to rotate different models across personas and researcher turns, which reduces systematic bias in the synthetic responses.
+**Multi-model mode** uses OpenRouter to route different models across personas and researcher turns, which reduces systematic bias in the synthetic responses.
 
 ```python
-# config.py
-USE_OPENROUTER = False  # flip to True for multi-model mode
+USE_OPENROUTER = True  # set to False to use basic mode (Anthropic SDK only)
+```
+
+In basic mode, `ANTHROPIC_MODEL` is used for every call and all randomization settings are ignored.
+
+### Randomization (multi-model mode only)
+
+Control whether persona and researcher models are randomized independently:
+
+```python
+RANDOMIZE_PERSONA_MODEL = True    # pick a random model per interview; False = always use PERSONA_MODELS[0]
+RANDOMIZE_RESEARCHER_MODEL = True  # pick a random model per turn; False = always use RESEARCHER_MODELS[0]
 ```
 
 ### Changing models
@@ -71,19 +81,23 @@ USE_OPENROUTER = False  # flip to True for multi-model mode
 # Basic mode
 ANTHROPIC_MODEL = "claude-opus-4-6"
 
-# Multi-model mode — persona gets a random model per interview
+# Multi-model mode
 PERSONA_MODELS = [
-    "anthropic/claude-opus-4.6-fast",
+    "nvidia/nemotron-3-super-120b-a12b:free",
     "openai/gpt-4o",
     ...
 ]
 
-# Researcher gets a fresh random model each turn
 RESEARCHER_MODELS = [
-    "anthropic/claude-opus-4.6-fast",
+    "minimax/minimax-m2.5:free",
     "openai/gpt-4o",
 ]
+
+# Model used to synthesize all transcripts into a final report
+SUMMARY_MODEL = "anthropic/claude-opus-4.6-fast"
 ```
+
+Free models (`:free` suffix) are available via OpenRouter but may be rate-limited. The system automatically retries with a different model from the combined pool on 429 or 404 errors. To use your own provider API keys for higher rate limits, add them at [openrouter.ai/settings/integrations](https://openrouter.ai/settings/integrations).
 
 ### Number of turns
 

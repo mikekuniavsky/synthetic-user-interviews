@@ -5,6 +5,8 @@ from pathlib import Path
 
 from config import (
     USE_OPENROUTER,
+    RANDOMIZE_PERSONA_MODEL,
+    RANDOMIZE_RESEARCHER_MODEL,
     ANTHROPIC_MODEL,
     PERSONA_MODELS,
     RESEARCHER_MODELS,
@@ -21,6 +23,10 @@ if USE_OPENROUTER:
     from api import call_openrouter as call_api
 else:
     from api import call_claude as call_api
+
+
+def _pick_researcher(researcher_models: list) -> str:
+    return random.choice(researcher_models) if RANDOMIZE_RESEARCHER_MODEL else researcher_models[0]
 
 
 def run_interview(persona: dict, researcher_models: list) -> list:
@@ -46,7 +52,7 @@ def run_interview(persona: dict, researcher_models: list) -> list:
     # Researcher opens the interview with a randomly chosen starting direction
     opening_prompt = random.choice(OPENING_PROMPTS)
     opening = call_api(
-        model=random.choice(researcher_models),
+        model=_pick_researcher(researcher_models),
         system_prompt=RESEARCHER_PROMPT,
         messages=[{"role": "user", "content": opening_prompt}],
     )
@@ -78,7 +84,7 @@ def run_interview(persona: dict, researcher_models: list) -> list:
 
         # Researcher follows up — pick a fresh random model each turn
         researcher_response = call_api(
-            model=random.choice(researcher_models),
+            model=_pick_researcher(researcher_models),
             system_prompt=RESEARCHER_PROMPT,
             messages=researcher_messages,
         )
@@ -185,7 +191,7 @@ def main():
 
     for i, persona in enumerate(PERSONAS):
         if USE_OPENROUTER:
-            persona["model"] = random.choice(PERSONA_MODELS)
+            persona["model"] = random.choice(PERSONA_MODELS) if RANDOMIZE_PERSONA_MODEL else PERSONA_MODELS[0]
         else:
             persona["model"] = ANTHROPIC_MODEL
 

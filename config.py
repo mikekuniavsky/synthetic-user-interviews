@@ -6,6 +6,8 @@ load_dotenv(".env.local")
 
 # --- Mode ---
 USE_OPENROUTER = True  # Set to True to use multi-model OpenRouter mode
+RANDOMIZE_PERSONA_MODEL = True    # Pick a random persona model per interview
+RANDOMIZE_RESEARCHER_MODEL = True  # Pick a random researcher model per turn
 
 # --- API keys (set in .env.local) ---
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
