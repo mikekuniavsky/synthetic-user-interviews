@@ -66,4 +66,14 @@ def call_openrouter(model: str, system_prompt: str, messages: list, max_tokens: 
     if not response.ok:
         print(f"API error {response.status_code}: {response.text}")
     response.raise_for_status()
-    return response.json()["choices"][0]["message"]["content"], model
+
+    content = response.json()["choices"][0]["message"]["content"]
+    if content is None:
+        alternatives = [m for m in _ALL_MODELS if m != model]
+        if alternatives:
+            fallback = random.choice(alternatives)
+            print(f"Null content from {model}, retrying with {fallback}")
+            return call_openrouter(fallback, system_prompt, messages, max_tokens=max_tokens)
+        raise ValueError(f"{model} returned null content and no fallback models are available")
+
+    return content, model

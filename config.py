@@ -21,9 +21,13 @@ ANTHROPIC_MODEL = "claude-opus-4-6"
 PERSONA_MODELS = [
     "google/gemma-4-31b-it:free",
     "arcee-ai/trinity-large-preview:free",
-    "anthropic/claude-opus-4.6-fast",
-    "openai/gpt-4o",
+ #   "anthropic/claude-opus-4.6-fast",
+    "claude-sonnet-4-5-20250929",
+    "openai/gpt-5.1-chat",
     "google/gemini-3-flash-preview",
+    "openrouter/elephant-alpha",
+    "deepseek/deepseek-v3.2",
+    "microsoft/phi-4",
     "mistralai/mistral-small-2603",
 ]
 
@@ -31,8 +35,8 @@ PERSONA_MODELS = [
 RESEARCHER_MODELS = [
     "minimax/minimax-m2.5:free",
     "google/gemma-4-31b-it:free",
-    "anthropic/claude-opus-4.6-fast",
-    "openai/gpt-4o",
+#    "anthropic/claude-opus-4.6-fast",
+    "openai/gpt-5.1-chat",
 ]
 
 SUMMARY_MODEL = "anthropic/claude-opus-4.6-fast"
