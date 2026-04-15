@@ -21,7 +21,7 @@ from summary_prompt import SUMMARY_PROMPT
 from interview_guide import OPENING_PROMPTS
 
 if USE_OPENROUTER:
-    from api import call_openrouter as call_api
+    from api import call_any as call_api
 else:
     from api import call_claude as call_api
 
