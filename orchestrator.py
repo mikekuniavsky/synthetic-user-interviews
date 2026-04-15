@@ -26,6 +26,27 @@ else:
     from api import call_claude as call_api
 
 
+class Agent:
+    """Wraps a model + system prompt + message history for one participant in an interview.
+
+    send() always receives a user message and returns the assistant response,
+    keeping the history in the correct alternating shape. self.model updates
+    to the actual model used if a fallback fires (switch-and-stay behaviour).
+    """
+
+    def __init__(self, model: str, system_prompt: str):
+        self.model = model
+        self.system_prompt = system_prompt
+        self.messages: list = []
+
+    def send(self, user_content: str) -> str:
+        self.messages.append({"role": "user", "content": user_content})
+        response, model_used = call_api(self.model, self.system_prompt, self.messages)
+        self.messages.append({"role": "assistant", "content": response})
+        self.model = model_used
+        return response
+
+
 def _pick_researcher(researcher_models: list) -> str:
     return random.choice(researcher_models) if RANDOMIZE_RESEARCHER_MODEL else researcher_models[0]
 
@@ -36,84 +57,50 @@ def run_interview(persona: dict, researcher_models: list) -> tuple[list, str]:
     Returns (transcript, researcher_model).
     """
 
-    # Pick one researcher model for the entire interview
-    researcher_model = _pick_researcher(researcher_models)
+    researcher = Agent(_pick_researcher(researcher_models), RESEARCHER_PROMPT)
+    persona_agent = Agent(persona["model"], persona["prompt"])
 
     print(f"\n{'='*60}")
     print(f"Starting interview with: {persona['name']}")
-    print(f"Persona model: {persona['model']}")
-    print(f"Researcher model: {researcher_model}")
+    print(f"Persona model: {persona_agent.model}")
+    print(f"Researcher model: {researcher.model}")
     print(f"{'='*60}\n")
 
-    # Separate conversation histories for each agent.
-    # Each agent only sees the conversation, not the other's system prompt.
-    researcher_messages = []
-    persona_messages = []
-
-    # Shared conversation log for saving
     transcript = []
 
-    # Researcher opens the interview with a randomly chosen starting direction
+    # Researcher generates the opening question from a random prompt seed
     opening_prompt = random.choice(OPENING_PROMPTS)
-    opening, opening_model = call_api(
-        model=researcher_model,
-        system_prompt=RESEARCHER_PROMPT,
-        messages=[{"role": "user", "content": opening_prompt}],
-    )
+    current_question = researcher.send(opening_prompt)
+    print(f"RESEARCHER ({researcher.model}): {current_question}\n")
+    transcript.append({"role": "researcher", "model": researcher.model, "content": current_question})
 
-    print(f"RESEARCHER ({opening_model}): {opening}\n")
-    transcript.append({"role": "researcher", "model": opening_model, "content": opening})
-
-    # Seed researcher history with the bootstrap turn that was used to generate
-    # the opening, so subsequent calls always start with a user message.
-    researcher_messages.append({"role": "user", "content": opening_prompt})
-    researcher_messages.append({"role": "assistant", "content": opening})
-    persona_messages.append({"role": "user", "content": opening})
-
-    # Main conversation loop — each turn is: researcher asks, persona answers.
-    # The loop ends on the persona's final answer, not a hanging researcher question.
     for turn in range(NUM_TURNS):
 
-        # On the second-to-last turn, cue the researcher to move to Topic 7 (Close)
-        # so the final turn is the persona's answer to the closing question.
+        # Persona answers the current question
+        persona_response = persona_agent.send(current_question)
+        print(f"{persona['name'].upper()}: {persona_response}\n")
+        transcript.append({"role": persona["name"], "content": persona_response})
+
+        # Last turn: interview ends on the persona's answer
+        if turn == NUM_TURNS - 1:
+            break
+
+        # Second-to-last turn: cue the researcher to close with Topic 7 so the
+        # persona's final answer wraps up the interview naturally
+        researcher_input = persona_response
         if turn == NUM_TURNS - 2:
-            cue = (
+            researcher_input += (
                 "\n\n[Note to interviewer: This is your second-to-last question. "
                 "Move to Topic 7 (Close) — ask what one thing they would change "
                 "about their early-stage process. The next response will be their last.]"
             )
-            researcher_messages[-1] = {
-                **researcher_messages[-1],
-                "content": researcher_messages[-1]["content"] + cue,
-            }
 
-        # Researcher asks
-        researcher_response, researcher_model = call_api(
-            model=researcher_model,
-            system_prompt=RESEARCHER_PROMPT,
-            messages=researcher_messages,
-        )
+        # Researcher follows up
+        current_question = researcher.send(researcher_input)
+        print(f"RESEARCHER ({researcher.model}): {current_question}\n")
+        transcript.append({"role": "researcher", "model": researcher.model, "content": current_question})
 
-        print(f"RESEARCHER ({researcher_model}): {researcher_response}\n")
-        transcript.append({"role": "researcher", "model": researcher_model, "content": researcher_response})
-
-        researcher_messages.append({"role": "assistant", "content": researcher_response})
-        persona_messages.append({"role": "user", "content": researcher_response})
-
-        # Persona answers
-        persona_response, persona_model_used = call_api(
-            model=persona["model"],
-            system_prompt=persona["prompt"],
-            messages=persona_messages,
-        )
-
-        print(f"{persona['name'].upper()}: {persona_response}\n")
-        transcript.append({"role": persona["name"], "content": persona_response})
-
-        persona_messages.append({"role": "assistant", "content": persona_response})
-        researcher_messages.append({"role": "user", "content": persona_response})
-
-    return transcript, researcher_model
+    return transcript, researcher.model
 
 
 def save_transcript(persona: dict, transcript: list, researcher_model: str, output_dir: Path) -> Path:
