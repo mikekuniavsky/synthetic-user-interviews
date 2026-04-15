@@ -180,6 +180,14 @@ def call_openrouter(model: str, system_prompt: str, messages: list, max_tokens: 
             print(f"Error 404 on {model}, retrying with {fallback}")
             return call_any(fallback, system_prompt, messages, max_tokens=max_tokens)
 
+    if response.status_code == 400:
+        error_msg = response.json().get("error", {}).get("message", "")
+        if "context length" in error_msg or "context_length" in error_msg or "maximum context" in error_msg:
+            fallback = _pick_fallback(model)
+            if fallback:
+                print(f"Context length exceeded on {model}, retrying with {fallback}")
+                return call_any(fallback, system_prompt, messages, max_tokens=max_tokens)
+
     if not response.ok:
         print(f"API error {response.status_code}: {response.text}")
     response.raise_for_status()
