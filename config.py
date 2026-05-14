@@ -42,7 +42,7 @@ PERSONA_MODELS = [
     "google/gemma-4-31b-it:free",
     "arcee-ai/trinity-large-preview:free",
  #   "anthropic/claude-opus-4.6-fast",
-    "anthropic/claude-sonnet-4.5",
+    "anthropic/claude-opus-4.7",
     "openai/gpt-5.1-chat",
     "google/gemini-3-flash-preview",
     "openrouter/elephant-alpha",
